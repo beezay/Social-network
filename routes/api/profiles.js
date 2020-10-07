@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const passport = require('passport')
+//Load Validation
+const validateProfileInput = require('../../validation/profile')
 
 // Load PROFILE MODEL
 const Profile = require('../../models/Profile')
+// Load USER MOdel
 const User = require('../../models/User')
+
+
 
 // @route   GET api/profiles/test
 // @desc    Tests profiles route
@@ -21,6 +26,7 @@ router.get('/', passport.authenticate('jwt', {session:false}), (req, res) => {
     const errors = {}
 
     Profile.findOne({ user: req.user.id })
+        .populate('user', ['name', 'avatar'])
         .then( profile => {
             if(!profile){
                 errors.noProfile = 'No Profile found for the User'
@@ -36,51 +42,53 @@ router.get('/', passport.authenticate('jwt', {session:false}), (req, res) => {
 // @desc    Create/Update User Profile
 // @access  Private
 router.post('/', passport.authenticate('jwt', {session:false}), (req, res) => {
-    //GET FIELDS
-    const profileFileds = {};
 
-    profileFileds.user = req.user.id;
-    if(req.body.handle) {
-        profileFileds.handle = req.body.handle;
+    const { errors, isValid } = validateProfileInput(req.body);
+
+    //Check Validation
+    if(!isValid) {
+        //Return any errors with 400 status
+        return res.status(400).json(errors);
     }
-    if(req.body.company) {
-        profileFileds.company = req.body.company;
-    }
-    if(req.body.website) {
-        profileFileds.website = req.body.website;
-    }
-    if(req.body.location) {
-        profileFileds.location = req.body.location;
-    }
-    if(req.body.bio) {
-        profileFileds.bio = req.body.bio;
-    }
-    if(req.body.status) {
-        profileFileds.status = req.body.status;
-    }
-    if(req.body.github) {
-        profileFileds.github = req.body.github;
-    }
+
+    //GET FIELDS
+    const profileFields = {};
+
+    profileFields.user = req.user.id;
+    if(req.body.handle) profileFields.handle = req.body.handle;
+    
+    if(req.body.company) profileFields.company = req.body.company;
+    
+    if(req.body.website) profileFields.website = req.body.website;
+    
+    if(req.body.location) profileFields.location = req.body.location;
+    
+    if(req.body.bio) profileFields.bio = req.body.bio;
+    
+    if(req.body.status) profileFields.status = req.body.status;
+    
+    if(req.body.github) profileFields.github = req.body.github;
+    
     //SKILLS
     if(typeof req.body.skills !== 'undefined') {
-        profileFileds.skills = req.body.skills.split(',');
+        profileFields.skills = req.body.skills.split(',');
     }
     //SOCIAL
-    profileFileds.social = {};
+    profileFields.social = {};
     if(req.body.youtube) {
-        profileFileds.social.youtube = req.body.youtube
+        profileFields.social.youtube = req.body.youtube
     }
     if(req.body.twitter) {
-        profileFileds.social.twitter = req.body.twitter
+        profileFields.social.twitter = req.body.twitter
     }
     if(req.body.facebook) {
-        profileFileds.social.facebook = req.body.facebook
+        profileFields.social.facebook = req.body.facebook
     }
     if(req.body.linkedin) {
-        profileFileds.social.linkedin = req.body.linkedin
+        profileFields.social.linkedin = req.body.linkedin
     }
     if(req.body.instagram) {
-        profileFileds.social.instagram = req.body.instagram
+        profileFields.social.instagram = req.body.instagram
     }
 
     Profile.findOne({user: req.user.id})
@@ -89,16 +97,15 @@ router.post('/', passport.authenticate('jwt', {session:false}), (req, res) => {
                     //Update
                     Profile.findOneAndUpdate(
                         {user: req.user.id},
-                        {$set: profileFileds},
+                        {$set: profileFields},
                         {new: true}
                     )
                     .then(profile => res.json(profile))
                 }
                 else{
                     //CREATE NEW
-
                     //Check if Handle Exist
-                    Profile.findOne({ handle: profileFileds.handle })
+                    Profile.findOne({ handle: profileFields.handle })
                         .then(profile => {
                             if(profile) {
                                 errors.handle = 'That Handle already Exist';
@@ -107,7 +114,7 @@ router.post('/', passport.authenticate('jwt', {session:false}), (req, res) => {
                         })
 
                     // Save Profile
-                    new Profile(profileFileds)
+                    new Profile(profileFields)
                         .save()
                         .then(profile => res.json(profile))
                 }
